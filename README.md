@@ -1,27 +1,76 @@
-# EdiGenerator
+# EDI Generator
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.0.7.
+A modern EDI (Electronic Data Interchange) document generator built with Angular.
 
-## Development server
+## Overview
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+This application helps generate and manage EDI documents for business-to-business transactions.
 
-## Code scaffolding
+## Features
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+- Generate EDI documents
+- Support for standard EDI formats
+- User-friendly interface
+- Document validation
+
+## Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+- Angular CLI
+
+## Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+
+# Navigate to project directory
+cd edi-generator
+
+# Install dependencies
+npm install
+```
+
+## Development
+
+```bash
+# Start development server
+ng serve
+
+# Navigate to http://localhost:4200
+```
 
 ## Build
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```bash
+# Build for production
+ng build --prod
 
-## Running unit tests
+# Output will be in dist/ directory
+```
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+## Usage
 
-## Running end-to-end tests
+1. Launch the application
+2. Select the EDI document type
+3. Fill in required fields
+4. Generate and download the EDI document
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## Technologies
 
-## Further help
+- Angular
+- TypeScript
+- HTML/CSS
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.
+
+## Contact
+
+For questions or support, please open an issue in the repository.

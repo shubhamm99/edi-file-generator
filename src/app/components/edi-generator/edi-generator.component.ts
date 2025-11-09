@@ -16,6 +16,8 @@ export class EdiGeneratorComponent implements OnInit, OnDestroy {
   isLoading = signal<boolean>(false);
   ediContent = signal<string>('');
   copySuccess = signal<boolean>(false);
+  validationErrors = signal<string[]>([]);
+  isValidEdi = signal<boolean>(true);
   ediFormGroup: FormGroup;
 
   // Collapse/Expand state management
@@ -87,6 +89,12 @@ export class EdiGeneratorComponent implements OnInit, OnDestroy {
       const formData = this.ediFormGroup.value;
       const ediOutput = this.ediGeneratorService.generate835(formData);
       this.ediContent.set(ediOutput);
+      
+      // Validate the generated EDI
+      const validation = this.ediGeneratorService.validate835(ediOutput);
+      this.isValidEdi.set(validation.isValid);
+      this.validationErrors.set(validation.errors);
+      
       this.isLoading.set(false);
     }, 500);
   }
@@ -134,6 +142,8 @@ export class EdiGeneratorComponent implements OnInit, OnDestroy {
     this.isSubmitted.set(false);
     this.ediContent.set('');
     this.copySuccess.set(false);
+    this.validationErrors.set([]);
+    this.isValidEdi.set(true);
 
     this.claimsExpanded = {};
     this.serviceLinesExpanded = {};
@@ -379,6 +389,26 @@ export class EdiGeneratorComponent implements OnInit, OnDestroy {
 
   removePlbAdjustment(index: number): void {
     this.plbAdjustments.removeAt(index);
+  }
+
+  downloadEDI(): void {
+    const content = this.ediContent();
+    if (!content) {
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    link.download = `EDI-835-${timestamp}.txt`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 
   ngOnInit() {}

@@ -1,64 +1,124 @@
 <div class="min-h-screen bg-gray-100 p-2">
-  <div class="max-w-[1800px] mx-auto">
-    <!-- Input Section -->
-    <div class="bg-white rounded-lg shadow-sm p-3 mb-3 border border-gray-200">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-base font-semibold text-gray-800">EDI Input</h2>
-        <div class="flex gap-2">
-          <button 
-            (click)="loadSampleEDI()" 
-            type="button"
-            title="Load a sample EDI 835 file"
-            class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 font-medium transition-colors shadow-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
-            Load Sample
-          </button>
-          <button 
-            (click)="clearInput()" 
-            type="button"
-            title="Clear all input and results"
-            class="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 font-medium transition-colors shadow-sm focus:ring-2 focus:ring-gray-300 focus:outline-none">
-            Clear
-          </button>
+  <h1 class="text-2xl font-semibold text-center mb-3 text-blue-600">
+    EDI Visualizer
+  </h1>
+
+  <!-- Split Layout Container -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 max-w-[1800px] mx-auto">
+    
+    <!-- Left Side - Input -->
+    <div class="bg-gray-50 rounded-lg shadow-sm p-2 overflow-y-auto" style="max-height: calc(100vh - 80px);">
+      <!-- Input Section -->
+      <div class="bg-white rounded-lg shadow-sm mb-3 overflow-hidden border border-gray-200">
+        <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 p-2 border-b border-indigo-200">
+          <h2 class="text-base font-semibold text-indigo-700">EDI Input</h2>
         </div>
-      </div>
-      <textarea 
-        [(ngModel)]="ediInput"
-        (ngModelChange)="ediInput.set($event)"
-        placeholder="Paste your EDI content here..."
-        class="w-full h-32 px-2 py-2 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-      ></textarea>
-      <div class="mt-2 text-center">
-        <button 
-          (click)="parseEDI()" 
-          type="button"
-          title="Parse and visualize the EDI content"
-          class="px-6 py-2 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 shadow-sm transition-all focus:ring-2 focus:ring-green-300 focus:outline-none">
-          ✓ Visualize EDI
-        </button>
+        <div class="p-3">
+          <textarea 
+            [(ngModel)]="ediInput"
+            (ngModelChange)="ediInput.set($event)"
+            placeholder="Paste your EDI 835 content here..."
+            class="w-full h-64 px-2 py-2 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+          ></textarea>
+          <div class="flex gap-2 mt-3">
+            <button 
+              (click)="parseEDI()" 
+              type="button"
+              title="Parse and visualize the EDI content"
+              class="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 shadow-sm transition-all focus:ring-2 focus:ring-green-300 focus:outline-none">
+              <span class="mr-1">✓</span> Visualize EDI
+            </button>
+            <button 
+              (click)="loadSampleEDI()" 
+              type="button"
+              title="Load a sample EDI 835 file"
+              class="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium transition-colors shadow-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+              Load Sample
+            </button>
+            <button 
+              (click)="clearInput()" 
+              type="button"
+              title="Clear all input and results"
+              class="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 font-medium transition-colors shadow-sm focus:ring-2 focus:ring-gray-300 focus:outline-none">
+              Clear
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Error Message -->
-    @if (errorMessage()) {
-      <div class="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-3 text-sm">
-        {{ errorMessage() }}
+    <!-- Right Side - Results -->
+    <div class="bg-white rounded-lg shadow-sm flex flex-col" style="max-height: calc(100vh - 80px);">
+      <!-- Results Header -->
+      <div class="bg-gradient-to-r from-slate-50 to-slate-100 p-2 border-b border-slate-200">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-700">EDI Analysis</h2>
+          <div class="flex gap-1.5">
+            <button 
+              (click)="downloadEDI()"
+              [disabled]="!ediInput()"
+              type="button"
+              aria-label="Download EDI input file"
+              title="Download the EDI input as .txt file"
+              class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium transition-colors shadow-sm focus:ring-2 focus:ring-blue-300 focus:outline-none">
+              Download EDI
+            </button>
+            <button 
+              (click)="downloadParsedData()"
+              [disabled]="!ediSummary()"
+              type="button"
+              aria-label="Download parsed data"
+              title="Download the parsed data as .json file"
+              class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium transition-colors shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none">
+              Download JSON
+            </button>
+          </div>
+        </div>
       </div>
-    }
 
-    <!-- Loading State -->
-    @if (isLoading()) {
-      <div class="bg-white rounded-lg shadow-sm p-6 text-center">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-        <p class="text-sm text-gray-600">Parsing EDI content...</p>
-      </div>
-    }
+      <!-- Results Content -->
+      <div class="flex-1 overflow-y-auto p-2">
+        <!-- Error Message -->
+        @if (errorMessage()) {
+          <div class="bg-red-50 border-2 border-red-300 rounded p-3 mb-3">
+            <div class="flex items-start gap-2">
+              <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              <div class="flex-1">
+                <h3 class="text-xs font-bold text-red-800 mb-1">{{ errorMessage() }}</h3>
+                
+                @if (validationErrors().length > 0) {
+                  <ul class="space-y-0.5 mt-2">
+                    @for (error of validationErrors(); track $index) {
+                      <li class="text-xs text-red-700 flex items-start gap-1">
+                        <span class="text-red-500 font-bold">•</span>
+                        <span>{{ error }}</span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            </div>
+          </div>
+        }
 
-    <!-- EDI Summary -->
-    @if (!isLoading() && ediSummary()) {
-      <div class="space-y-3">
-        <!-- Payment Information -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-          <h2 class="text-base font-semibold text-gray-800 mb-2 border-b border-gray-200 pb-2">Payment Information</h2>
+        <!-- Loading State -->
+        @if (isLoading()) {
+          <div class="flex items-center justify-center h-full">
+            <div class="text-center">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+              <p class="text-sm text-gray-600">Parsing EDI content...</p>
+            </div>
+          </div>
+        }
+
+        <!-- EDI Summary -->
+        @if (!isLoading() && ediSummary()) {
+          <div class="space-y-3">
+            <!-- Payment Information -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+              <h2 class="text-base font-semibold text-gray-800 mb-2 border-b border-gray-200 pb-2">Payment Information</h2>
           <div class="grid md:grid-cols-3 gap-3">
             <div class="bg-green-50 border border-green-200 rounded p-2">
               <p class="text-xs text-green-700 font-medium">Check Amount</p>
@@ -287,21 +347,23 @@
             </div>
           </div>
         }
-      </div>
-    }
+          </div>
+        }
 
-    <!-- Empty State -->
-    @if (!isLoading() && parsedSegments().length === 0 && !errorMessage()) {
-      <div class="bg-white rounded-lg shadow-sm p-8 text-center">
-        <div class="text-gray-400">
-          <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-          </svg>
-          <p class="text-sm font-medium">No EDI content visualized yet</p>
-          <p class="text-xs mt-1">Paste EDI content above or load a sample to get started</p>
-        </div>
+        <!-- Empty State -->
+        @if (!isLoading() && !ediSummary() && !errorMessage()) {
+          <div class="flex items-center justify-center h-full">
+            <div class="text-center text-gray-400">
+              <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              </svg>
+              <p class="text-sm font-medium">No EDI content visualized yet</p>
+              <p class="text-xs mt-1">Paste EDI content on the left and click "Visualize EDI"</p>
+            </div>
+          </div>
+        }
       </div>
-    }
+    </div>
   </div>
 </div>

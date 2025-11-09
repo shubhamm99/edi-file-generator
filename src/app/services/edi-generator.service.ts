@@ -345,4 +345,179 @@ export class EdiGeneratorService {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${hours}${minutes}`;
   }
+
+  validate835(ediContent: string): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!ediContent || ediContent.trim().length === 0) {
+      errors.push('EDI content is empty');
+      return { isValid: false, errors };
+    }
+
+    // Check if content looks like EDI at all
+    if (!ediContent.includes('ISA')) {
+      errors.push('Content does not appear to be EDI format - missing ISA segment');
+      return { isValid: false, errors };
+    }
+
+    // Detect delimiter and segment terminator
+    const delimiter = this.detectDelimiter(ediContent);
+    const segmentTerminator = this.detectSegmentTerminator(ediContent);
+
+    if (!delimiter) {
+      errors.push('Could not detect element delimiter (* or | expected)');
+      return { isValid: false, errors };
+    }
+
+    if (!segmentTerminator) {
+      errors.push('Could not detect segment terminator (~ expected)');
+      return { isValid: false, errors };
+    }
+
+    // Split into segments
+    const segments = ediContent.split(segmentTerminator).filter(s => s.trim());
+
+    // Must have at least 7 segments (ISA, GS, ST, BPR, SE, GE, IEA)
+    if (segments.length < 7) {
+      errors.push(`EDI must have at least 7 segments, found only ${segments.length}`);
+      return { isValid: false, errors };
+    }
+
+    // Check for required segments
+    const requiredSegments = ['ISA', 'GS', 'ST', 'BPR', 'SE', 'GE', 'IEA'];
+    const foundSegments = new Set<string>();
+
+    segments.forEach(segment => {
+      const trimmed = segment.trim();
+      if (!trimmed) return;
+      
+      const segmentId = trimmed.split(delimiter)[0];
+      
+      // Validate segment ID is uppercase letters and/or numbers, 2-3 characters
+      if (!/^[A-Z0-9]{2,3}$/.test(segmentId)) {
+        errors.push(`Invalid segment identifier: "${segmentId}" - must be 2-3 uppercase alphanumeric characters`);
+      }
+      
+      foundSegments.add(segmentId);
+    });
+
+    requiredSegments.forEach(required => {
+      if (!foundSegments.has(required)) {
+        errors.push(`Missing required segment: ${required}`);
+      }
+    });
+
+    // Validate ISA segment structure
+    const isaSegment = segments.find(s => s.trim().startsWith('ISA'));
+    if (isaSegment) {
+      const cleanIsa = isaSegment.replace(/[\r\n]/g, '');
+      const isaElements = cleanIsa.split(delimiter);
+      
+      // ISA must have exactly 17 elements (including the segment ID)
+      if (isaElements.length < 17) {
+        errors.push(`ISA segment must have 16 data elements, found only ${isaElements.length - 1}`);
+      }
+      
+      // Check ISA segment length (should be around 105-106 characters)
+      if (cleanIsa.length < 100 || cleanIsa.length > 110) {
+        errors.push(`ISA segment has unusual length: ${cleanIsa.length} characters (expected ~105)`);
+      }
+    }
+
+    // Check segment order
+    if (segments.length > 0) {
+      const firstSegmentId = segments[0].trim().split(delimiter)[0];
+      if (firstSegmentId !== 'ISA') {
+        errors.push(`First segment must be ISA, found: "${firstSegmentId}"`);
+      }
+
+      const lastSegmentId = segments[segments.length - 1].trim().split(delimiter)[0];
+      if (lastSegmentId !== 'IEA') {
+        errors.push(`Last segment must be IEA, found: "${lastSegmentId}"`);
+      }
+    }
+
+    // Line breaks are optional - EDI can be on a single line or multiple lines
+    // No validation needed for line breaks
+
+    // Validate segment terminator consistency
+    const terminatorCount = (ediContent.match(/~/g) || []).length;
+    if (terminatorCount !== segments.length && terminatorCount !== segments.length + 1) {
+      errors.push(`Inconsistent segment terminators. Found ${terminatorCount} terminators for ${segments.length} segments`);
+    }
+
+    // Check for empty or invalid segments
+    let invalidSegmentCount = 0;
+    segments.forEach((seg, idx) => {
+      const trimmed = seg.trim();
+      if (!trimmed) return;
+      
+      const elements = trimmed.split(delimiter);
+      const segmentId = elements[0];
+      
+      // Each segment must have at least a segment ID and one data element
+      if (elements.length < 2) {
+        errors.push(`Segment ${idx + 1} ("${segmentId}") has no data elements`);
+        invalidSegmentCount++;
+      }
+      
+      // Check for segments that are just random text
+      if (elements.length < 2 && trimmed.length > 10) {
+        errors.push(`Invalid content at position ${idx + 1}: "${trimmed.substring(0, 30)}..." does not appear to be a valid EDI segment`);
+        invalidSegmentCount++;
+      }
+    });
+    
+    if (invalidSegmentCount > 3) {
+      errors.push(`Too many invalid segments (${invalidSegmentCount}) - content may not be valid EDI`);
+    }
+
+    // Validate ST/SE transaction set envelope
+    const stSegments = segments.filter(s => s.trim().startsWith('ST'));
+    const seSegments = segments.filter(s => s.trim().startsWith('SE'));
+    if (stSegments.length !== seSegments.length) {
+      errors.push(`Mismatched ST (${stSegments.length}) and SE (${seSegments.length}) segments`);
+    }
+
+    // Validate GS/GE functional group envelope
+    const gsSegments = segments.filter(s => s.trim().startsWith('GS'));
+    const geSegments = segments.filter(s => s.trim().startsWith('GE'));
+    if (gsSegments.length !== geSegments.length) {
+      errors.push(`Mismatched GS (${gsSegments.length}) and GE (${geSegments.length}) segments`);
+    }
+
+    // Validate ISA/IEA interchange envelope
+    const isaSegments = segments.filter(s => s.trim().startsWith('ISA'));
+    const ieaSegments = segments.filter(s => s.trim().startsWith('IEA'));
+    if (isaSegments.length !== ieaSegments.length) {
+      errors.push(`Mismatched ISA (${isaSegments.length}) and IEA (${ieaSegments.length}) segments`);
+    }
+
+    // Check for 835-specific segments
+    if (foundSegments.has('ST')) {
+      const stSegment = segments.find(s => s.trim().startsWith('ST'));
+      if (stSegment) {
+        const elements = stSegment.split(delimiter);
+        if (elements[1] !== '835') {
+          errors.push(`Expected transaction type 835, found ${elements[1]}`);
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  private detectDelimiter(content: string): string | null {
+    if (content.includes('*')) return '*';
+    if (content.includes('|')) return '|';
+    return null;
+  }
+
+  private detectSegmentTerminator(content: string): string | null {
+    if (content.includes('~')) return '~';
+    return null;
+  }
 }

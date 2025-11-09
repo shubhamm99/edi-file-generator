@@ -405,6 +405,15 @@
               <span>{{ copySuccess() ? '✓ Copied!' : 'Copy' }}</span>
             </button>
             <button 
+              (click)="downloadEDI()"
+              [disabled]="!ediContent()"
+              type="button"
+              aria-label="Download EDI file"
+              title="Download EDI as .txt file"
+              class="px-3 py-1 text-sm bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium transition-colors shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none">
+              Download
+            </button>
+            <button 
               (click)="clearPreview()"
               [disabled]="!ediContent()"
               type="button"
@@ -427,6 +436,41 @@
             </div>
           </div>
         } @else if (ediContent()) {
+          <!-- Validation Status -->
+          <div class="mb-2">
+            @if (!isValidEdi() && validationErrors().length > 0) {
+              <!-- Validation Errors -->
+              <div class="bg-red-50 border-2 border-red-300 rounded p-2">
+                <div class="flex items-start gap-2">
+                  <svg class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                  </svg>
+                  <div class="flex-1">
+                    <h3 class="text-xs font-bold text-red-800 mb-1">⚠️ Validation Failed ({{ validationErrors().length }} issue{{ validationErrors().length !== 1 ? 's' : '' }})</h3>
+                    <ul class="space-y-0.5">
+                      @for (error of validationErrors(); track $index) {
+                        <li class="text-xs text-red-700 flex items-start gap-1">
+                          <span class="text-red-500 font-bold">•</span>
+                          <span>{{ error }}</span>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <!-- Valid EDI Badge -->
+              <div class="bg-green-50 border-2 border-green-300 rounded p-2">
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span class="text-xs font-semibold text-green-800">✓ Valid EDI 835 Format - All required segments present</span>
+                </div>
+              </div>
+            }
+          </div>
+          
           <pre class="bg-gray-50 p-2 rounded border border-gray-200 text-xs font-mono whitespace-pre-wrap break-all overflow-x-auto">{{ ediContent() }}</pre>
         } @else {
           <div class="flex items-center justify-center h-full">

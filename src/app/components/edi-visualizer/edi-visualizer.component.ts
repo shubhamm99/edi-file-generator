@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { EdiGeneratorService } from '../../services/edi-generator.service';
 
 interface ParsedSegment {
   segmentId: string;
@@ -65,7 +66,10 @@ export class EdiVisualizerComponent {
   ediSummary = signal<EdiSummary | null>(null);
   isLoading = signal<boolean>(false);
   errorMessage = signal<string>('');
+  validationErrors = signal<string[]>([]);
   showSegments = signal<boolean>(false);
+
+  constructor(private ediGeneratorService: EdiGeneratorService) {}
 
   parseEDI(): void {
     const input = this.ediInput();
@@ -77,9 +81,22 @@ export class EdiVisualizerComponent {
 
     this.isLoading.set(true);
     this.errorMessage.set('');
+    this.validationErrors.set([]);
 
     setTimeout(() => {
       try {
+        // Validate EDI first
+        const validation = this.ediGeneratorService.validate835(input);
+        
+        if (!validation.isValid) {
+          this.validationErrors.set(validation.errors);
+          this.errorMessage.set('EDI validation failed. Please fix the errors below.');
+          this.parsedSegments.set([]);
+          this.ediSummary.set(null);
+          this.isLoading.set(false);
+          return;
+        }
+        
         const segments = this.parseEdiContent(input);
         this.parsedSegments.set(segments);
         
@@ -334,6 +351,7 @@ export class EdiVisualizerComponent {
     this.parsedSegments.set([]);
     this.ediSummary.set(null);
     this.errorMessage.set('');
+    this.validationErrors.set([]);
     this.showSegments.set(false);
   }
 
@@ -341,5 +359,46 @@ export class EdiVisualizerComponent {
     const sample = `ISA*00*          *00*          *ZZ*SUBMITTERID    *ZZ*RECEIVERID     *241108*1430*U*00401*000000001*0*P*:~GS*HP*PAYERID*RECEIVERID*20241108*1430*1*X*005010X221A1~ST*835*0001*005010X221A1~BPR*I*1500.00*C*ACH*CCP*01*000000000*DA*0000000000*PAYERID***01*000000000*DA*0000000000*20241108~TRN*1*123456789012*1234567890~N1*PR*PAYER NAME*XX*PAYERID~N3*123 MAIN ST~N4*ANYTOWN*ST*12345~N1*PE*PROVIDER NAME*XX*1234567890~N3*123 MAIN ST~N4*ANYTOWN*ST*12345~CLP*CLM1731067437976*1*1500.00*1500.00*0.00*MB*1234567890*11*1~NM1*QC*1***~NM1*IL*1***~NM1*74*2***~NM1*82*2***~SVC*HC:99213*1500.00*1500.00**1~PLB*1234567890*20241108~SE*17*0001~GE*1*1~IEA*1*000000001~`;
     this.ediInput.set(sample);
     this.parseEDI();
+  }
+
+  downloadEDI(): void {
+    const content = this.ediInput();
+    if (!content) {
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    link.download = `EDI-835-Input-${timestamp}.txt`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  downloadParsedData(): void {
+    const summary = this.ediSummary();
+    if (!summary) {
+      return;
+    }
+
+    const jsonContent = JSON.stringify(summary, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    link.download = `EDI-835-Parsed-${timestamp}.json`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   }
 }

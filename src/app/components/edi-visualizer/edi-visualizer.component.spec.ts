@@ -62,6 +62,14 @@ IEA*1*000000001~`;
     it('should have empty parsed segments', () => {
       expect(component.parsedSegments().length).toBe(0);
     });
+
+    it('should have Monaco editor enabled by default', () => {
+      expect(component.useMonaco()).toBe(true);
+    });
+
+    it('should have default editor theme', () => {
+      expect(component.editorTheme()).toBe('edi-theme');
+    });
   });
 
   describe('EDI Validation', () => {
@@ -396,6 +404,46 @@ IEA*1*000000001~`;
         expect(() => JSON.stringify(summary, null, 2)).not.toThrow();
         done();
       }, 400);
+    });
+  });
+
+  describe('Monaco Editor Integration', () => {
+    it('should handle editor value changes via signal', () => {
+      const testValue = 'ISA*test~';
+      component.ediInput.set(testValue);
+      expect(component.ediInput()).toBe(testValue);
+    });
+
+    it('should toggle theme between light and dark', () => {
+      expect(component.editorTheme()).toBe('vs');
+      
+      component.toggleTheme();
+      expect(component.editorTheme()).toBe('vs-dark');
+      expect(component.editorOptions().theme).toBe('vs-dark');
+      
+      component.toggleTheme();
+      expect(component.editorTheme()).toBe('vs');
+      expect(component.editorOptions().theme).toBe('vs');
+    });
+
+    it('should toggle Monaco editor usage', () => {
+      expect(component.useMonaco()).toBe(true);
+      
+      component.useMonaco.set(false);
+      expect(component.useMonaco()).toBe(false);
+      
+      component.useMonaco.set(true);
+      expect(component.useMonaco()).toBe(true);
+    });
+
+    it('should load sample EDI in correct format', () => {
+      component.loadSampleEDI();
+      
+      const input = component.ediInput();
+      expect(input).toContain('ISA*');
+      expect(input).toContain('835');
+      expect(input).toContain('~');
+      expect(input.split('\n').length).toBeGreaterThan(1); // Multi-line format
     });
   });
 

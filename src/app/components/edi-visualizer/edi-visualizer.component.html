@@ -11,15 +11,46 @@
       <!-- Input Section -->
       <div class="bg-white rounded-lg shadow-sm mb-3 overflow-hidden border border-gray-200">
         <div class="bg-gradient-to-r from-indigo-50 to-indigo-100 p-2 border-b border-indigo-200">
-          <h2 class="text-base font-semibold text-indigo-700">EDI Input</h2>
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-indigo-700">EDI Input</h2>
+            <div class="flex gap-2 items-center">
+              <label class="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  [(ngModel)]="useMonaco"
+                  (ngModelChange)="useMonaco.set($event)"
+                  class="rounded"
+                />
+                <span>Monaco Editor</span>
+              </label>
+              @if (useMonaco()) {
+                <button 
+                  (click)="toggleTheme()" 
+                  type="button"
+                  title="Toggle editor theme"
+                  class="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium transition-colors">
+                  {{ editorTheme() === 'edi-theme' ? '🌙' : '☀️' }}
+                </button>
+              }
+            </div>
+          </div>
         </div>
         <div class="p-3">
-          <textarea 
-            [(ngModel)]="ediInput"
-            (ngModelChange)="ediInput.set($event)"
-            placeholder="Paste your EDI 835 content here..."
-            class="w-full h-64 px-2 py-2 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
-          ></textarea>
+          @if (useMonaco()) {
+            <ngx-monaco-editor
+              [options]="editorOptions()"
+              [(ngModel)]="ediInput"
+              (ngModelChange)="ediInput.set($event)"
+              style="height: 400px;"
+            ></ngx-monaco-editor>
+          } @else {
+            <textarea 
+              [(ngModel)]="ediInput"
+              (ngModelChange)="ediInput.set($event)"
+              placeholder="Paste your EDI 835 content here..."
+              class="w-full h-96 px-2 py-2 text-xs font-mono border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+            ></textarea>
+          }
           <div class="flex gap-2 mt-3">
             <button 
               (click)="parseEDI()" 

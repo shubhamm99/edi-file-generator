@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, effect, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EdiGeneratorService } from '../../services/edi-generator.service';
+import { MonacoEditorModule, EditorComponent } from 'ngx-monaco-editor-v2';
 
 interface ParsedSegment {
   segmentId: string;
@@ -56,11 +57,13 @@ interface ProviderAdjustment {
 @Component({
   selector: 'app-edi-visualizer',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MonacoEditorModule],
   templateUrl: './edi-visualizer.component.html',
   styleUrl: './edi-visualizer.component.scss',
 })
 export class EdiVisualizerComponent {
+  @ViewChild(EditorComponent, { static: false }) editorComponent?: EditorComponent;
+  
   ediInput = signal<string>('');
   parsedSegments = signal<ParsedSegment[]>([]);
   ediSummary = signal<EdiSummary | null>(null);
@@ -68,14 +71,55 @@ export class EdiVisualizerComponent {
   errorMessage = signal<string>('');
   validationErrors = signal<string[]>([]);
   showSegments = signal<boolean>(false);
+  editorTheme = signal<string>('vs');
+  useMonaco = signal<boolean>(false);
 
-  constructor(private ediGeneratorService: EdiGeneratorService) {}
+  editorOptions = signal({
+    theme: 'vs',
+    language: 'plaintext',
+    minimap: { enabled: true },
+    automaticLayout: true,
+    fontSize: 13,
+    wordWrap: 'on' as const,
+    scrollBeyondLastLine: false
+  });
+
+  private parseTimeout: any;
+
+  constructor(private ediGeneratorService: EdiGeneratorService) {
+    // Auto-parse as user types (debounced)
+    effect(() => {
+      const input = this.ediInput();
+      
+      // Clear previous timeout
+      if (this.parseTimeout) {
+        clearTimeout(this.parseTimeout);
+      }
+      
+      // Only parse if there's content
+      if (input && input.trim()) {
+        // Debounce parsing by 500ms - use setTimeout to defer signal writes
+        this.parseTimeout = setTimeout(() => {
+          this.parseEDI();
+        }, 500);
+      } else {
+        // Defer signal writes to avoid writing inside effect
+        setTimeout(() => {
+          this.parsedSegments.set([]);
+          this.ediSummary.set(null);
+          this.errorMessage.set('');
+          this.validationErrors.set([]);
+        }, 0);
+      }
+    }, { allowSignalWrites: true });
+  }
 
   parseEDI(): void {
     const input = this.ediInput();
     
     if (!input.trim()) {
       this.errorMessage.set('Please enter EDI content to visualize');
+      this.clearEditorMarkers();
       return;
     }
 
@@ -94,8 +138,12 @@ export class EdiVisualizerComponent {
           this.parsedSegments.set([]);
           this.ediSummary.set(null);
           this.isLoading.set(false);
+          this.updateEditorMarkers(validation.errors);
           return;
         }
+        
+        // Clear markers if validation passes
+        this.clearEditorMarkers();
         
         const segments = this.parseEdiContent(input);
         this.parsedSegments.set(segments);
@@ -356,7 +404,28 @@ export class EdiVisualizerComponent {
   }
 
   loadSampleEDI(): void {
-    const sample = `ISA*00*          *00*          *ZZ*SUBMITTERID    *ZZ*RECEIVERID     *241108*1430*U*00401*000000001*0*P*:~GS*HP*PAYERID*RECEIVERID*20241108*1430*1*X*005010X221A1~ST*835*0001*005010X221A1~BPR*I*1500.00*C*ACH*CCP*01*000000000*DA*0000000000*PAYERID***01*000000000*DA*0000000000*20241108~TRN*1*123456789012*1234567890~N1*PR*PAYER NAME*XX*PAYERID~N3*123 MAIN ST~N4*ANYTOWN*ST*12345~N1*PE*PROVIDER NAME*XX*1234567890~N3*123 MAIN ST~N4*ANYTOWN*ST*12345~CLP*CLM1731067437976*1*1500.00*1500.00*0.00*MB*1234567890*11*1~NM1*QC*1***~NM1*IL*1***~NM1*74*2***~NM1*82*2***~SVC*HC:99213*1500.00*1500.00**1~PLB*1234567890*20241108~SE*17*0001~GE*1*1~IEA*1*000000001~`;
+    const sample = `ISA*00*          *00*          *ZZ*SUBMITTERID    *ZZ*RECEIVERID     *241108*1430*U*00401*000000001*0*P*:~
+GS*HP*PAYERID*RECEIVERID*20241108*1430*1*X*005010X221A1~
+ST*835*0001*005010X221A1~
+BPR*I*1500.00*C*ACH*CCP*01*000000000*DA*0000000000*PAYERID***01*000000000*DA*0000000000*20241108~
+TRN*1*123456789012*1234567890~
+N1*PR*PAYER NAME*XX*PAYERID~
+N3*123 MAIN ST~
+N4*ANYTOWN*ST*12345~
+N1*PE*PROVIDER NAME*XX*1234567890~
+N3*123 MAIN ST~
+N4*ANYTOWN*ST*12345~
+CLP*CLM1731067437976*1*1500.00*1500.00*0.00*MB*1234567890*11*1~
+NM1*QC*1*DOE*JOHN****MI*123456789~
+NM1*IL*1*DOE*JOHN****MI*123456789~
+NM1*74*2*PROVIDER GROUP*****XX*1234567890~
+NM1*82*2*BILLING PROVIDER*****XX*9876543210~
+SVC*HC:99213*1500.00*1500.00**1~
+DTM*472*20241108~
+PLB*1234567890*20241108~
+SE*19*0001~
+GE*1*1~
+IEA*1*000000001~`;
     this.ediInput.set(sample);
     this.parseEDI();
   }
@@ -400,5 +469,83 @@ export class EdiVisualizerComponent {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  }
+
+  toggleTheme(): void {
+    const currentTheme = this.editorTheme();
+    const newTheme = currentTheme === 'vs' ? 'vs-dark' : 'vs';
+    this.editorTheme.set(newTheme);
+    this.editorOptions.set({
+      ...this.editorOptions(),
+      theme: newTheme
+    });
+  }
+
+  private updateEditorMarkers(errors: string[]): void {
+    if (!this.editorComponent || !this.useMonaco()) {
+      return;
+    }
+
+    const editor = (this.editorComponent as any)._editor;
+    if (!editor) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    // Create markers from validation errors
+    const markers = errors.map((error, index) => {
+      // Try to extract line number from error message if it contains one
+      const lineMatch = error.match(/line (\d+)/i);
+      const line = lineMatch ? parseInt(lineMatch[1]) : 1;
+      
+      // Try to find which segment has the error
+      const segmentMatch = error.match(/segment (\w+)/i);
+      const content = model.getValue();
+      const lines = content.split('\n');
+      let targetLine = line;
+      
+      if (segmentMatch && !lineMatch) {
+        // Find the line containing this segment
+        const segmentId = segmentMatch[1];
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim().startsWith(segmentId)) {
+            targetLine = i + 1;
+            break;
+          }
+        }
+      }
+
+      return {
+        severity: 8, // Error severity (monaco.MarkerSeverity.Error)
+        startLineNumber: targetLine,
+        startColumn: 1,
+        endLineNumber: targetLine,
+        endColumn: lines[targetLine - 1]?.length + 1 || 1000,
+        message: error
+      };
+    });
+
+    // Set markers on the model
+    const monaco = (window as any).monaco;
+    if (monaco) {
+      monaco.editor.setModelMarkers(model, 'edi-validation', markers);
+    }
+  }
+
+  private clearEditorMarkers(): void {
+    if (!this.editorComponent || !this.useMonaco()) {
+      return;
+    }
+
+    const editor = (this.editorComponent as any)._editor;
+    if (!editor) return;
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    const monaco = (window as any).monaco;
+    if (monaco) {
+      monaco.editor.setModelMarkers(model, 'edi-validation', []);
+    }
   }
 }
